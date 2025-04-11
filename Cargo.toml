@@ -1,0 +1,6 @@
+[package]
+name = "ca65-lsp-instruction-doc-parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
