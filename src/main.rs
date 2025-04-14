@@ -16,8 +16,14 @@ enum DocParserState {
 }
 
 #[derive(Serialize)]
+pub struct KeywordInfo {
+    documentation: String,
+    snippet_type: String,
+}
+
+#[derive(Serialize)]
 struct IndexedDocumentation {
-    keys_to_doc: HashMap<String, String>,
+    keys_to_doc: HashMap<String, KeywordInfo>,
     keys_with_shared_doc: HashMap<String, String>,
 }
 
@@ -29,9 +35,18 @@ pub fn main() {
         .map_while(Result::ok);
 
     let mut instruction_doc = IndexedDocumentation {
-        keys_to_doc: HashMap::<String, String>::new(),
+        keys_to_doc: HashMap::<String, KeywordInfo>::new(),
         keys_with_shared_doc: HashMap::<String, String>::new(),
     };
+
+    let snippet_types: HashMap<String, Vec<String>> = serde_json::from_str(include_str!("../instruction-snippet-types.json")).expect("Could not deserialize snippet type json");
+    let snippet_type_map: HashMap<String, String> = snippet_types
+        .into_iter()
+        .flat_map(move |(snippet_type, member_list)| {
+            member_list.into_iter().map(move |keyword| (keyword, snippet_type.clone()))
+        })
+        .collect();
+
 
     let mut state = DocParserState::Opcodes;
     let mut curr_opcodes: Vec<String> = vec![];
@@ -48,7 +63,10 @@ pub fn main() {
             DocParserState::Description => {
                 if line == "{.}" {
                     let first_opcode = curr_opcodes.pop().expect("No opcodes preceded a documentation block");
-                    instruction_doc.keys_to_doc.insert(first_opcode.to_owned(), curr_description.to_owned());
+                    instruction_doc.keys_to_doc.insert(first_opcode.to_owned(), KeywordInfo {
+                        documentation: curr_description.to_owned(),
+                        snippet_type: snippet_type_map.get(&first_opcode).expect("Could not retrieve snippet type for given instruction").clone(),
+                    });
                     for opcode in curr_opcodes.drain(..) {
                         instruction_doc.keys_with_shared_doc.insert(opcode.to_owned(), first_opcode.to_owned());
                     }
